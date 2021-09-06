@@ -16,7 +16,7 @@
         <link rel="canonical" href="https://docker-mailserver.github.io/docker-mailserver/edge/config/security/mail_crypt/">
       
       <link rel="icon" href="../../../assets/logo/favicon-32x32.png">
-      <meta name="generator" content="mkdocs-1.1.2, mkdocs-material-7.1.7">
+      <meta name="generator" content="mkdocs-1.2.2, mkdocs-material-7.2.6">
     
     
       
@@ -24,10 +24,10 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.ca7ac06f.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.802231af.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.f1a3b89f.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.3f5d1f46.min.css">
         
       
     
@@ -46,6 +46,8 @@
     
     
       
+
+
     
     
   </head>
@@ -71,7 +73,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#basic-setup" class="md-skip">
+        <a href="#single-encryption-key-global-method" class="md-skip">
           Skip to content
         </a>
       
@@ -139,14 +141,18 @@
   <label class="md-search__overlay" for="__search"></label>
   <div class="md-search__inner" role="search">
     <form class="md-search__form" name="search">
-      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" data-md-state="active" required>
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
       <label class="md-search__icon md-icon" for="__search">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
       </label>
-      <button type="reset" class="md-search__icon md-icon" aria-label="Clear" tabindex="-1">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>
-      </button>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" aria-label="Clear" tabindex="-1">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>
+        </button>
+      </nav>
+      
     </form>
     <div class="md-search__output">
       <div class="md-search__scrollwrap" data-md-scrollfix>
@@ -646,8 +652,8 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#basic-setup" class="md-nav__link">
-    Basic Setup
+  <a href="#single-encryption-key-global-method" class="md-nav__link">
+    Single Encryption Key / Global Method
   </a>
   
 </li>
@@ -1056,6 +1062,18 @@
   
 
           
+            
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/tutorials/blog-posts/" class="md-nav__link">
+        Blog Posts
+      </a>
+    </li>
+  
+
+          
         </ul>
       </nav>
     </li>
@@ -1090,6 +1108,18 @@
     <li class="md-nav__item">
       <a href="../../../examples/uses-cases/forward-only-mailserver-with-ldap-authentication/" class="md-nav__link">
         Forward-Only Mailserver with LDAP
+      </a>
+    </li>
+  
+
+          
+            
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/uses-cases/imap-folders/" class="md-nav__link">
+        Customize IMAP Folders
       </a>
     </li>
   
@@ -1254,8 +1284,8 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#basic-setup" class="md-nav__link">
-    Basic Setup
+  <a href="#single-encryption-key-global-method" class="md-nav__link">
+    Single Encryption Key / Global Method
   </a>
   
 </li>
@@ -1287,62 +1317,54 @@
 </div>
 <p>Official Dovecot documentation: <a href="https://doc.dovecot.org/configuration_manual/mail_crypt_plugin/">https://doc.dovecot.org/configuration_manual/mail_crypt_plugin/</a></p>
 <hr />
-<h2 id="basic-setup"><a class="toclink" href="#basic-setup">Basic Setup</a></h2>
+<h2 id="single-encryption-key-global-method"><a class="toclink" href="#single-encryption-key-global-method">Single Encryption Key / Global Method</a></h2>
 <ol>
-<li>Before you can enable mail_crypt, you'll need to copy out several dovecot/conf.d files to the host (from a running container) and then take the container down:
-    <div class="highlight"><pre><span></span><code>mkdir -p config/dovecot
-docker cp mailserver:/etc/dovecot/conf.d/20-lmtp.conf config/dovecot/
-docker cp mailserver:/etc/dovecot/conf.d/20-imap.conf config/dovecot/
-docker cp mailserver:/etc/dovecot/conf.d/20-pop3.conf config/dovecot/
-docker-compose down
-</code></pre></div></li>
-<li>You then need to <a href="https://doc.dovecot.org/configuration_manual/mail_crypt_plugin/#ec-key">generate your global EC key</a>.</li>
-<li>The EC key needs to be available in the container. I prefer to mount a /certs directory into the container: 
-    <div class="highlight"><pre><span></span><code><span class="nt">services</span><span class="p">:</span>
-  <span class="nt">mailserver</span><span class="p">:</span>
-    <span class="nt">image</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">docker.io/mailserver/docker-mailserver:latest</span>
-    <span class="nt">volumes</span><span class="p">:</span>
-    <span class="l l-Scalar l-Scalar-Plain">. . .</span>
-      <span class="l l-Scalar l-Scalar-Plain">- ./certs/:/certs</span>
-    <span class="l l-Scalar l-Scalar-Plain">. . .</span>
-</code></pre></div></li>
-<li>While you're editing the docker-compose.yml, add the configuration files you copied out:
-    <div class="highlight"><pre><span></span><code><span class="nt">services</span><span class="p">:</span>
-  <span class="nt">mailserver</span><span class="p">:</span>
-    <span class="nt">image</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">docker.io/mailserver/docker-mailserver:latest</span>
-    <span class="nt">volumes</span><span class="p">:</span>
-    <span class="l l-Scalar l-Scalar-Plain">. . .</span>
-      <span class="l l-Scalar l-Scalar-Plain">- ./config/dovecot/20-lmtp.conf:/etc/dovecot/conf.d/20-lmtp.conf</span>
-      <span class="l l-Scalar l-Scalar-Plain">- ./config/dovecot/20-imap.conf:/etc/dovecot/conf.d/20-imap.conf</span>
-      <span class="l l-Scalar l-Scalar-Plain">- ./config/dovecot/20-pop3.conf:/etc/dovecot/conf.d/20-pop3.conf</span>
-      <span class="l l-Scalar l-Scalar-Plain">- ./certs/:/certs</span>
-    <span class="l l-Scalar l-Scalar-Plain">. . .</span>
-</code></pre></div></li>
-<li>The <code>mail_crypt</code> plugin, unless you're using a non-standard configuration of docker-mailserver, should be enabled on both <code>lmtp</code> and <code>imap</code>. You'll want to edit three different files:<ul>
-<li><code>./config/dovecot/20-lmtp.conf</code>
-  <div class="highlight"><pre><span></span><code>protocol lmtp {
-  mail_plugins = $mail_plugins sieve mail_crypt
-  plugin {
-    mail_crypt_global_private_key = &lt;/certs/ecprivkey.pem
-    mail_crypt_global_public_key = &lt;/certs/ecpubkey.pem
-    mail_crypt_save_version = 2
-  }
+<li>
+<p>Create <code>10-custom.conf</code> and populate it with the following:</p>
+<div class="highlight"><pre><span></span><code># Enables mail_crypt for all services (imap, pop3, etc)
+mail_plugins = $mail_plugins mail_crypt
+plugin {
+  mail_crypt_global_private_key = &lt;/certs/ecprivkey.pem
+  mail_crypt_global_public_key = &lt;/certs/ecpubkey.pem
+  mail_crypt_save_version = 2
 }
-</code></pre></div></li>
-<li><code>./config/dovecot/20-imap.conf</code>
-  <div class="highlight"><pre><span></span><code>protocol imap {
-  mail_plugins = $mail_plugins imap_quota mail_crypt
-  plugin {
-    mail_crypt_global_private_key = &lt;/certs/ecprivkey.pem
-    mail_crypt_global_public_key = &lt;/certs/ecpubkey.pem
-    mail_crypt_save_version = 2
-  }
-}
-</code></pre></div></li>
-<li>If you use pop3, make the same changes in <code>20-pop3.conf</code></li>
-</ul>
+</code></pre></div>
 </li>
-<li>Start the container and monitor the logs for any errors</li>
+<li>
+<p>Shutdown your mailserver (<code>docker-compose down</code>)</p>
+</li>
+<li>
+<p>You then need to <a href="https://doc.dovecot.org/configuration_manual/mail_crypt_plugin/#ec-key">generate your global EC key</a>. We named them <code>/certs/ecprivkey.pem</code> and <code>/certs/ecpubkey.pem</code> in step #1.</p>
+</li>
+<li>
+<p>The EC key needs to be available in the container. I prefer to mount a /certs directory into the container: 
+    <div class="highlight"><pre><span></span><code><span class="nt">services</span><span class="p">:</span>
+  <span class="nt">mailserver</span><span class="p">:</span>
+    <span class="nt">image</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">docker.io/mailserver/docker-mailserver:latest</span>
+    <span class="nt">volumes</span><span class="p">:</span>
+    <span class="l l-Scalar l-Scalar-Plain">. . .</span>
+      <span class="l l-Scalar l-Scalar-Plain">- ./certs/:/certs</span>
+    <span class="l l-Scalar l-Scalar-Plain">. . .</span>
+</code></pre></div></p>
+</li>
+<li>
+<p>While you're editing the <code>docker-compose.yml</code>, add the configuration file:
+    <div class="highlight"><pre><span></span><code><span class="nt">services</span><span class="p">:</span>
+  <span class="nt">mailserver</span><span class="p">:</span>
+    <span class="nt">image</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">docker.io/mailserver/docker-mailserver:latest</span>
+    <span class="nt">volumes</span><span class="p">:</span>
+    <span class="l l-Scalar l-Scalar-Plain">. . .</span>
+      <span class="l l-Scalar l-Scalar-Plain">- ./config/dovecot/10-custom.conf:/etc/dovecot/conf.d/10-custom.conf</span>
+      <span class="l l-Scalar l-Scalar-Plain">- ./certs/:/certs</span>
+    <span class="l l-Scalar l-Scalar-Plain">. . .</span>
+</code></pre></div></p>
+</li>
+<li>
+<p>Start the container, monitor the logs for any errors, send yourself a message, and then confirm the file on disk is encrypted:
+    <div class="highlight"><pre><span></span><code>[root@ip-XXXXXXXXXX ~]# cat -A /mnt/efs-us-west-2/maildata/awesomesite.com/me/cur/1623989305.M6v�z�@�� m}��,��9����B*�247.us-west-2.compute.inE��\Ck*�@7795,W=7947:2,
+T�9�8t�6�� t���e�W��S   `�H��C�ڤ �yeY��XZ��^�d�/��+�A
+</code></pre></div></p>
+</li>
 </ol>
 <p>This should be the minimum required for encryption of the mail while in storage.</p>
                 
@@ -1358,8 +1380,9 @@ docker-compose down
           </div>
         </div>
         
-          <a href="#" class="md-top md-icon" title="Back to top" data-md-component="top" data-md-state="hidden">
+          <a href="#" class="md-top md-icon" data-md-component="top" data-md-state="hidden">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"/></svg>
+            Back to top
           </a>
         
       </main>
@@ -1425,10 +1448,10 @@ docker-compose down
     <div class="md-dialog" data-md-component="dialog">
       <div class="md-dialog__inner md-typeset"></div>
     </div>
-    <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.tabs", "navigation.top", "navigation.expand", "navigation.instant"], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "../../../assets/javascripts/workers/search.b0710199.min.js", "version": {"provider": "mike"}}</script>
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.tabs", "navigation.top", "navigation.expand", "navigation.instant"], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "../../../assets/javascripts/workers/search.409db549.min.js", "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.76f349be.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.756773cc.min.js"></script>
       
     
   </body>
