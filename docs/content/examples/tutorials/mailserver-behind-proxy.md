@@ -23,7 +23,7 @@ Luckily `dovecot` and `postfix` are both Proxy-Protocol ready softwares so it de
 
 The configuration depends on the used proxy system. I will provide the configuration examples of [traefik v2](https://traefik.io/) using IMAP and SMTP with implicit TLS.
 
-Feel free to add your configuration if you achived the same goal using different proxy software below:
+Feel free to add your configuration if you archived the same goal using different proxy software below:
 
 ??? "Traefik v2"
 
@@ -33,7 +33,7 @@ Feel free to add your configuration if you achived the same goal using different
     version: '3.7'
     services:
       reverse-proxy:
-        image: traefik:v2.4
+        image: traefik:latest
         container_name: docker-traefik
         restart: always
         command:
@@ -60,7 +60,7 @@ Feel free to add your configuration if you achived the same goal using different
     version: '2'
     services:
       mail:
-        image: mailserver/docker-mailserver:release-v7.2.0
+        image: mailserver/docker-mailserver:latest
         restart: always
         networks:
           - proxy
@@ -72,6 +72,7 @@ Feel free to add your configuration if you achived the same goal using different
           - "traefik.tcp.services.smtp.loadbalancer.server.port=25"
           - "traefik.tcp.services.smtp.loadbalancer.proxyProtocol.version=1"
           - "traefik.tcp.routers.smtp-ssl.rule=HostSNI(`*`)"
+          - "traefik.tcp.routers.smtp-ssl.tls=false"
           - "traefik.tcp.routers.smtp-ssl.entrypoints=smtp-ssl"
           - "traefik.tcp.routers.smtp-ssl.service=smtp-ssl"
           - "traefik.tcp.services.smtp-ssl.loadbalancer.server.port=465"
@@ -88,11 +89,11 @@ Feel free to add your configuration if you achived the same goal using different
     [...]
     ```
 
-    Keep in mind that it is neccessary to use port `10993` here. More information below at `dovecot` configuration.
+    Keep in mind that it is necessary to use port `10993` here. More information below at `dovecot` configuration.
 
 ### Configuration of the Backend (`dovecot` and `postfix`)
 
-The following changes can be achived completely by adding the content to the appropriate files by using the projects [function to overwrite config files][docs-optionalconfig].
+The following changes can be achieved completely by adding the content to the appropriate files by using the projects [function to overwrite config files][docs-optionalconfig].
 
 Changes for `postfix` can be applied by adding the following content to `config/postfix-main.cf`:
 
