@@ -4,8 +4,6 @@ NAME   ?= mailserver-testing:ci
 VCS_REF = $(shell git rev-parse --short HEAD)
 VCS_VER = $(shell git describe --tags --contains --always)
 
-export CDIR = $(shell pwd)
-
 # -----------------------------------------------
 # --- Generic Build Targets ---------------------
 # -----------------------------------------------
@@ -25,7 +23,7 @@ clean:
 # remove running and stopped test containers
 	-@ [[ -d config.bak ]] && { rm -rf config ; mv config.bak config ; } || :
 	-@ [[ -d testconfig.bak ]] && { sudo rm -rf test/config ; mv testconfig.bak test/config ; } || :
-	-@ for container in $$(docker ps -a --filter name='^/mail$$|^ldap_for_mail$$|^mail_override_hostname$$|^open-dkim$$|^hadolint$$|^eclint$$|^shellcheck$$' | sed 1d | cut -f 1-1 -d ' '); do docker rm -f $$container; done
+	-@ for container in $$(docker ps -a --filter name='^/mail$$|^ldap_for_mail$$|^mail_override_hostname$$|^mail_non_subdomain_hostname$$|^open-dkim$$|^hadolint$$|^eclint$$|^shellcheck$$|mail_changedetector.*' | sed 1d | cut -f 1-1 -d ' '); do docker rm -f $$container; done
 	-@ sudo rm -rf test/onedir test/alias test/quota test/relay test/config/dovecot-lmtp/userdb test/config/key* test/config/opendkim/keys/domain.tld/ test/config/opendkim/keys/example.com/ test/config/opendkim/keys/localdomain2.com/ test/config/postfix-aliases.cf test/config/postfix-receive-access.cf test/config/postfix-receive-access.cfe test/config/dovecot-quotas.cf test/config/postfix-send-access.cf test/config/postfix-send-access.cfe test/config/relay-hosts/chksum test/config/relay-hosts/postfix-aliases.cf test/config/dhparams.pem test/config/dovecot-lmtp/dh.pem test/config/relay-hosts/dovecot-quotas.cf test/config/user-patches.sh test/alias/config/postfix-virtual.cf test/quota/config/dovecot-quotas.cf test/quota/config/postfix-accounts.cf test/relay/config/postfix-relaymap.cf test/relay/config/postfix-sasl-password.cf test/duplicate_configs/
 
 # -----------------------------------------------
@@ -40,7 +38,7 @@ generate-accounts:
 	@ echo "           # this is also a test comment, :O" >> test/config/postfix-accounts.cf
 
 tests:
-	@ NAME=$(NAME) ./test/bats/bin/bats test/*.bats
+	@ NAME=$(NAME) ./test/bats/bin/bats --timing test/*.bats
 
 .PHONY: ALWAYS_RUN
 test/%.bats: ALWAYS_RUN

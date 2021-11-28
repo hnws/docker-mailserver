@@ -1,14 +1,19 @@
 #! /bin/bash
+# TODO: Adapt for compatibility with LDAP
+# Only the cert renewal change detection may be relevant for LDAP?
 
 # shellcheck source=./helper-functions.sh
 . /usr/local/bin/helper-functions.sh
 
-LOG_DATE=$(date +"%Y-%m-%d %H:%M:%S ")
+function _log_date
+{
+  date +"%Y-%m-%d %H:%M:%S"
+}
+
+LOG_DATE=$(_log_date)
 _notify 'task' "${LOG_DATE} Start check-for-changes script."
 
-SCRIPT_NAME="$(basename "$0")"
-
-# ? ––––––––––––––––––––––––––––––––––––––––––––– Checks
+# ? --------------------------------------------- Checks
 
 cd /tmp/docker-mailserver || exit 1
 
@@ -30,24 +35,18 @@ fi
 
 # determine postmaster address, duplicated from start-mailserver.sh
 # this script previously didn't work when POSTMASTER_ADDRESS was empty
-if [[ -n ${OVERRIDE_HOSTNAME} ]]
-then
-  DOMAINNAME="${OVERRIDE_HOSTNAME#*.}"
-else
-  DOMAINNAME="$(hostname -d)"
-fi
+_obtain_hostname_and_domainname
 
 PM_ADDRESS="${POSTMASTER_ADDRESS:=postmaster@${DOMAINNAME}}"
 _notify 'inf' "${LOG_DATE} Using postmaster address ${PM_ADDRESS}"
+
+# Change detection delayed during startup to avoid conflicting writes
 sleep 10
+
+_notify 'inf' "$(_log_date) check-for-changes is ready"
 
 while true
 do
-  LOG_DATE=$(date +"%Y-%m-%d %H:%M:%S ")
-
-  # Lock configuration while working
-  create_lock "${SCRIPT_NAME}"
-
   # get chksum and check it, no need to lock config yet
   _monitored_files_checksums >"${CHKSUM_FILE}.new"
   cmp --silent -- "${CHKSUM_FILE}" "${CHKSUM_FILE}.new"
@@ -57,7 +56,8 @@ do
   # 2 – inaccessible or missing argument
   if [ $? -eq 1 ]
   then
-    _notify 'inf' "${LOG_DATE} Change detected"
+    _notify 'inf' "$(_log_date) Change detected"
+    create_lock # Shared config safety lock
     CHANGED=$(grep -Fxvf "${CHKSUM_FILE}" "${CHKSUM_FILE}.new" | sed 's/^[^ ]\+  //')
 
     # Bug alert! This overwrites the alias set by start-mailserver.sh
@@ -70,173 +70,66 @@ do
     # Also note that changes are performed in place and are not atomic
     # We should fix that and write to temporary files, stop, swap and start
 
+    # TODO: Consider refactoring this:
     for FILE in ${CHANGED}
     do
       case "${FILE}" in
+        # This file is only relevant to Traefik, and is where it stores the certificates
+        # it manages. When a change is detected it's assumed to be a possible cert renewal
+        # that needs to be extracted for `docker-mailserver` to switch to.
         "/etc/letsencrypt/acme.json" )
-          for CERTDOMAIN in ${SSL_DOMAIN} ${HOSTNAME} ${DOMAINNAME}
+          _notify 'inf' "'/etc/letsencrypt/acme.json' has changed, extracting certs.."
+          # This breaks early as we only need the first successful extraction. For more details see `setup-stack.sh` `SSL_TYPE=letsencrypt` case handling.
+          # NOTE: HOSTNAME is set via `helper-functions.sh`, it is not the original system HOSTNAME ENV anymore.
+          # TODO: SSL_DOMAIN is Traefik specific, it no longer seems relevant and should be considered for removal.
+          FQDN_LIST=("${SSL_DOMAIN}" "${HOSTNAME}" "${DOMAINNAME}")
+          for CERT_DOMAIN in "${FQDN_LIST[@]}"
           do
-            _extract_certs_from_acme "${CERTDOMAIN}" && break
+            _notify 'inf' "Attempting to extract for '${CERT_DOMAIN}'"
+            _extract_certs_from_acme "${CERT_DOMAIN}" && break
           done
           ;;
 
+        # This seems like an invalid warning, as if the whole loop and case statement
+        # are only intended for the `acme.json` file..?
         * )
-          _notify 'warn' 'File not found for certificate in check_for_changes.sh'
+          _notify 'warn' "No certificate found in '${FILE}'"
           ;;
 
       esac
     done
 
-    # regenerate postix aliases
-    echo "root: ${PM_ADDRESS}" >/etc/aliases
-    if [[ -f /tmp/docker-mailserver/postfix-aliases.cf ]]
-    then
-      cat /tmp/docker-mailserver/postfix-aliases.cf >>/etc/aliases
-    fi
-    postalias /etc/aliases
-
     # regenerate postfix accounts
-    : >/etc/postfix/vmailbox
-    : >/etc/dovecot/userdb
+    [[ ${SMTP_ONLY} -ne 1 ]] && _create_accounts
 
-    if [[ -f /tmp/docker-mailserver/postfix-accounts.cf ]] && [[ ${ENABLE_LDAP} -ne 1 ]]
-    then
-      sed -i 's/\r//g' /tmp/docker-mailserver/postfix-accounts.cf
-      echo "# WARNING: this file is auto-generated. Modify config/postfix-accounts.cf to edit user list." >/etc/postfix/vmailbox
+    _rebuild_relayhost
 
-      # Checking that /tmp/docker-mailserver/postfix-accounts.cf ends with a newline
-      # shellcheck disable=SC1003
-      sed -i -e '$a\' /tmp/docker-mailserver/postfix-accounts.cf
-      chown dovecot:dovecot /etc/dovecot/userdb
-      chmod 640 /etc/dovecot/userdb
-      sed -i -e '/\!include auth-ldap\.conf\.ext/s/^/#/' /etc/dovecot/conf.d/10-auth.conf
-      sed -i -e '/\!include auth-passwdfile\.inc/s/^#//' /etc/dovecot/conf.d/10-auth.conf
+    # regenerate postix aliases
+    _create_aliases
 
-      # rebuild relay host
-      if [[ -n ${RELAY_HOST} ]]
-      then
-        # keep old config
-        : >/etc/postfix/sasl_passwd
-        if [[ -n ${SASL_PASSWD} ]]
-        then
-          echo "${SASL_PASSWD}" >>/etc/postfix/sasl_passwd
-        fi
-
-        # add domain-specific auth from config file
-        if [[ -f /tmp/docker-mailserver/postfix-sasl-password.cf ]]
-        then
-          while read -r LINE
-          do
-            if ! grep -q -e "\s*#" <<< "${LINE}"
-            then
-              echo "${LINE}" >>/etc/postfix/sasl_passwd
-            fi
-          done < <(grep -v "^\s*$\|^\s*\#" /tmp/docker-mailserver/postfix-sasl-password.cf || true)
-        fi
-
-        # add default relay
-        if [[ -n "${RELAY_USER}" ]] && [[ -n "${RELAY_PASSWORD}" ]]
-        then
-          echo "[${RELAY_HOST}]:${RELAY_PORT}		${RELAY_USER}:${RELAY_PASSWORD}" >>/etc/postfix/sasl_passwd
-        fi
-      fi
-
-      # creating users ; 'pass' is encrypted
-      # comments and empty lines are ignored
-      while IFS=$'|' read -r LOGIN PASS USER_ATTRIBUTES
-      do
-        USER=$(echo "${LOGIN}" | cut -d @ -f1)
-        DOMAIN=$(echo "${LOGIN}" | cut -d @ -f2)
-
-        # test if user has a defined quota
-        if [[ -f /tmp/docker-mailserver/dovecot-quotas.cf ]]
-        then
-          declare -a USER_QUOTA
-          IFS=':' ; read -r -a USER_QUOTA < <(grep "${USER}@${DOMAIN}:" -i /tmp/docker-mailserver/dovecot-quotas.cf)
-          unset IFS
-
-          [[ ${#USER_QUOTA[@]} -eq 2 ]] && USER_ATTRIBUTES="${USER_ATTRIBUTES} userdb_quota_rule=*:bytes=${USER_QUOTA[1]}"
-        fi
-
-        echo "${LOGIN} ${DOMAIN}/${USER}/" >>/etc/postfix/vmailbox
-
-        # user database for dovecot has the following format:
-        # user:password:uid:gid:(gecos):home:(shell):extra_fields
-        # example :
-        # ${LOGIN}:${PASS}:5000:5000::/var/mail/${DOMAIN}/${USER}::userdb_mail=maildir:/var/mail/${DOMAIN}/${USER}
-        echo "${LOGIN}:${PASS}:5000:5000::/var/mail/${DOMAIN}/${USER}::${USER_ATTRIBUTES}" >>/etc/dovecot/userdb
-        mkdir -p "/var/mail/${DOMAIN}/${USER}"
-
-        if [[ -e /tmp/docker-mailserver/${LOGIN}.dovecot.sieve ]]
-        then
-          cp "/tmp/docker-mailserver/${LOGIN}.dovecot.sieve" "/var/mail/${DOMAIN}/${USER}/.dovecot.sieve"
-        fi
-
-        echo "${DOMAIN}" >>/tmp/vhost.tmp
-      done < <(grep -v "^\s*$\|^\s*\#" /tmp/docker-mailserver/postfix-accounts.cf)
-    fi
-
-    [[ -n ${RELAY_HOST} ]] && _populate_relayhost_map
-
-
-    if [[ -f /etc/postfix/sasl_passwd ]]
-    then
-      chown root:root /etc/postfix/sasl_passwd
-      chmod 0600 /etc/postfix/sasl_passwd
-    fi
-
-    if [[ -f postfix-virtual.cf ]]
-    then
-      # regenerate postfix aliases
-      : >/etc/postfix/virtual
-      : >/etc/postfix/regexp
-
-      if [[ -f /tmp/docker-mailserver/postfix-virtual.cf ]]
-      then
-        cp -f /tmp/docker-mailserver/postfix-virtual.cf /etc/postfix/virtual
-
-        # the `to` seems to be important; don't delete it
-        # shellcheck disable=SC2034
-        while read -r FROM TO
-        do
-          UNAME=$(echo "${FROM}" | cut -d @ -f1)
-          DOMAIN=$(echo "${FROM}" | cut -d @ -f2)
-
-          # if they are equal it means the line looks like: "user1	 other@domain.tld"
-          [ "${UNAME}" != "${DOMAIN}" ] && echo "${DOMAIN}" >>/tmp/vhost.tmp
-        done  < <(grep -v "^\s*$\|^\s*\#" /tmp/docker-mailserver/postfix-virtual.cf || true)
-      fi
-
-      if [[ -f /tmp/docker-mailserver/postfix-regexp.cf ]]
-      then
-        cp -f /tmp/docker-mailserver/postfix-regexp.cf /etc/postfix/regexp
-        sed -i -e '/^virtual_alias_maps/{
-s/ regexp:.*//
-s/$/ regexp:\/etc\/postfix\/regexp/
-}' /etc/postfix/main.cf
-      fi
-    fi
-
-    if [[ -f /tmp/vhost.tmp ]]
-    then
-      sort < /tmp/vhost.tmp | uniq >/etc/postfix/vhost
-      rm /tmp/vhost.tmp
-    fi
+    # regenerate /etc/postfix/vhost
+    # NOTE: If later adding support for LDAP with change detection and this method is called,
+    # be sure to mimic `setup-stack.sh:_setup_ldap` which appends to `/tmp/vhost.tmp`.
+    _create_postfix_vhost
 
     if find /var/mail -maxdepth 3 -a \( \! -user 5000 -o \! -group 5000 \) | read -r
     then
       chown -R 5000:5000 /var/mail
     fi
 
+    _notify 'inf' "Restarting services due to detected changes.."
+
     supervisorctl restart postfix
 
     # prevent restart of dovecot when smtp_only=1
     [[ ${SMTP_ONLY} -ne 1 ]] && supervisorctl restart dovecot
+
+    remove_lock
+    _notify 'inf' "$(_log_date) Completed handling of detected change"
   fi
 
   # mark changes as applied
   mv "${CHKSUM_FILE}.new" "${CHKSUM_FILE}"
-  remove_lock "${SCRIPT_NAME}"
 
   sleep 1
 done
