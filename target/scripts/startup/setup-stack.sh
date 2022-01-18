@@ -20,6 +20,7 @@ function _setup_supervisor
           /etc/supervisor/supervisord.conf
 
         supervisorctl reload
+        exit
         ;;
 
       'warn' )
@@ -46,6 +47,7 @@ function _setup_default_vars
 
   # update REPORT_SENDER - must be done done after _check_hostname
   REPORT_SENDER="${REPORT_SENDER:=mailserver-report@${HOSTNAME}}"
+  LOGWATCH_SENDER="${LOGWATCH_SENDER:=${REPORT_SENDER}}"
   PFLOGSUMM_SENDER="${PFLOGSUMM_SENDER:=${REPORT_SENDER}}"
 
   # set PFLOGSUMM_TRIGGER here for backwards compatibility
@@ -68,6 +70,7 @@ function _setup_default_vars
   LOGWATCH_RECIPIENT="${LOGWATCH_RECIPIENT:=${REPORT_RECIPIENT}}"
 
   VARS[LOGWATCH_RECIPIENT]="${LOGWATCH_RECIPIENT}"
+  VARS[LOGWATCH_SENDER]="${LOGWATCH_SENDER}"
   VARS[PFLOGSUMM_RECIPIENT]="${PFLOGSUMM_RECIPIENT}"
   VARS[PFLOGSUMM_SENDER]="${PFLOGSUMM_SENDER}"
   VARS[PFLOGSUMM_TRIGGER]="${PFLOGSUMM_TRIGGER}"
@@ -383,7 +386,7 @@ function _setup_ldap
 
   # Add protocol to DOVECOT_URIS so that we can use dovecot's "uris" option:
   # https://doc.dovecot.org/configuration_manual/authentication/ldap/
-  if [[ "${DOVECOT_LDAP_MAPPING["DOVECOT_URIS"]}" != *'://'* ]]
+  if [[ ${DOVECOT_LDAP_MAPPING["DOVECOT_URIS"]} != *'://'* ]]
   then
     DOVECOT_LDAP_MAPPING["DOVECOT_URIS"]="ldap://${DOVECOT_LDAP_MAPPING["DOVECOT_URIS"]}"
   fi
@@ -562,7 +565,7 @@ function _setup_saslauthd
   [[ -z ${SASLAUTHD_LDAP_PASSWORD} ]] && SASLAUTHD_LDAP_PASSWORD="${LDAP_BIND_PW}"
   [[ -z ${SASLAUTHD_LDAP_SEARCH_BASE} ]] && SASLAUTHD_LDAP_SEARCH_BASE="${LDAP_SEARCH_BASE}"
 
-  if [[ "${SASLAUTHD_LDAP_SERVER}" != *'://'* ]]
+  if [[ ${SASLAUTHD_LDAP_SERVER} != *'://'* ]]
   then
     SASLAUTHD_LDAP_SERVER="ldap://${SASLAUTHD_LDAP_SERVER}"
   fi
@@ -1099,10 +1102,31 @@ function _setup_postfix_vhost
   _create_postfix_vhost
 }
 
-function _setup_inet_protocols
+function _setup_postfix_inet_protocols
 {
   _notify 'task' 'Setting up POSTFIX_INET_PROTOCOLS option'
   postconf -e "inet_protocols = ${POSTFIX_INET_PROTOCOLS}"
+}
+
+function _setup_dovecot_inet_protocols
+{
+  local PROTOCOL
+
+  _notify 'task' 'Setting up DOVECOT_INET_PROTOCOLS option'
+
+  # https://dovecot.org/doc/dovecot-example.conf
+  if [[ ${DOVECOT_INET_PROTOCOLS} == "ipv4" ]]
+  then
+    PROTOCOL='*' # IPv4 only
+  elif [[ ${DOVECOT_INET_PROTOCOLS} == "ipv6" ]]
+  then
+    PROTOCOL='[::]' # IPv6 only
+  else
+    # Unknown value, panic.
+    dms_panic__invalid_value 'DOVECOT_INET_PROTOCOLS' "${DOVECOT_INET_PROTOCOLS}"
+  fi
+
+  sedfile -i "s|^#listen =.*|listen = ${PROTOCOL}|g" /etc/dovecot/dovecot.conf
 }
 
 function _setup_docker_permit
@@ -1462,6 +1486,8 @@ function _setup_logwatch
 
   echo 'LogFile = /var/log/mail/freshclam.log' >>/etc/logwatch/conf/logfiles/clam-update.conf
 
+  echo "MailFrom = ${LOGWATCH_SENDER}" >> /etc/logwatch/conf/logwatch.conf
+
   case "${LOGWATCH_INTERVAL}" in
     'daily' )
       _notify 'inf' "Creating daily cron job for logwatch reports"
@@ -1510,4 +1536,14 @@ function _setup_fail2ban
   then
     echo -e "[Init]\nblocktype = DROP" > /etc/fail2ban/action.d/iptables-common.local
   fi
+}
+
+function _setup_dnsbl_disable
+{
+  _notify 'task' 'Disabling postfix DNS block list (zen.spamhaus.org)'
+  sedfile -i '/^smtpd_recipient_restrictions = / s/, reject_rbl_client zen.spamhaus.org//' /etc/postfix/main.cf
+
+  _notify 'task' 'Disabling postscreen DNS block lists'
+  postconf -e "postscreen_dnsbl_action = ignore"
+  postconf -e "postscreen_dnsbl_sites = "
 }

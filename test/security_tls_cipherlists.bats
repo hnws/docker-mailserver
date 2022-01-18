@@ -127,7 +127,7 @@ function collect_cipherlist_data() {
         "${NAME}" # Image name
     assert_success
 
-    wait_for_finished_setup_in_container tls_test_cipherlists
+    wait_for_tcp_port_in_container 25 tls_test_cipherlists
     # NOTE: An rDNS query for the container IP will resolve to `<container name>.<network name>.`
 
     # Make directory with test user ownership. Avoids Docker creating with root ownership.
@@ -160,7 +160,7 @@ function compare_cipherlist() {
     local RESULTS_FILE=$2
     local EXPECTED_CIPHERLIST=$3
 
-    run jq '.scanResult[0].fs[] | select(.id=="'"${TARGET_CIPHERLIST}"'") | .finding' "${TLS_RESULTS_DIR}/${RESULTS_FILE}"
+    run jq '.scanResult[0].serverPreferences[] | select(.id=="'"${TARGET_CIPHERLIST}"'") | .finding' "${TLS_RESULTS_DIR}/${RESULTS_FILE}"
     assert_success
     assert_output "${EXPECTED_CIPHERLIST}"
 }
@@ -171,7 +171,7 @@ function check_cipherlists() {
     local p25=$2 # optional suffix
 
     # TLS_LEVEL `modern` doesn't have TLS v1.0 or v1.1 cipher suites. Sets TLS v1.2 as minimum.
-    if [[ "${TLS_LEVEL}" == "intermediate" ]]
+    if [[ ${TLS_LEVEL} == "intermediate" ]]
         then
             compare_cipherlist "cipherorder_TLSv1"   "${RESULTS_FILE}" "$(get_cipherlist "TLSv1${p25}")"
             compare_cipherlist "cipherorder_TLSv1_1" "${RESULTS_FILE}" "$(get_cipherlist "TLSv1_1${p25}")"
@@ -187,7 +187,7 @@ function check_cipherlists() {
 function get_cipherlist() {
     local TLS_VERSION=$1
 
-    if [[ "${TLS_VERSION}" == "TLSv1_3" ]]
+    if [[ ${TLS_VERSION} == "TLSv1_3" ]]
         then
             # TLS v1.3 cipher suites are not user defineable and not unique to the available certificate(s).
             # They do not support server enforced order either.

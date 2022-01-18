@@ -19,10 +19,12 @@ declare -a FUNCS_SETUP FUNCS_FIX FUNCS_CHECK FUNCS_MISC DAEMONS_START
 VARS[AMAVIS_LOGLEVEL]="${AMAVIS_LOGLEVEL:=0}"
 VARS[DEFAULT_RELAY_HOST]="${DEFAULT_RELAY_HOST:=}"
 VARS[DMS_DEBUG]="${DMS_DEBUG:=0}"
+VARS[DOVECOT_INET_PROTOCOLS]="${DOVECOT_INET_PROTOCOLS:=all}"
 VARS[DOVECOT_MAILBOX_FORMAT]="${DOVECOT_MAILBOX_FORMAT:=maildir}"
 VARS[DOVECOT_TLS]="${DOVECOT_TLS:=no}"
 VARS[ENABLE_AMAVIS]="${ENABLE_AMAVIS:=1}"
 VARS[ENABLE_CLAMAV]="${ENABLE_CLAMAV:=0}"
+VARS[ENABLE_DNSBL]="${ENABLE_DNSBL:=0}"
 VARS[ENABLE_FAIL2BAN]="${ENABLE_FAIL2BAN:=0}"
 VARS[ENABLE_FETCHMAIL]="${ENABLE_FETCHMAIL:=0}"
 VARS[ENABLE_LDAP]="${ENABLE_LDAP:=0}"
@@ -67,6 +69,7 @@ VARS[SSL_TYPE]="${SSL_TYPE:=}"
 VARS[SUPERVISOR_LOGLEVEL]="${SUPERVISOR_LOGLEVEL:=warn}"
 VARS[TLS_LEVEL]="${TLS_LEVEL:=modern}"
 VARS[UPDATE_CHECK_INTERVAL]="${UPDATE_CHECK_INTERVAL:=1d}"
+# shellcheck disable=SC2034
 VARS[VIRUSMAILS_DELETE_DELAY]="${VIRUSMAILS_DELETE_DELAY:=7}"
 
 export HOSTNAME DOMAINNAME CHKSUM_FILE
@@ -107,8 +110,10 @@ function register_functions
   [[ ${ENABLE_LDAP} -eq 1 ]] && _register_setup_function '_setup_ldap'
   [[ ${ENABLE_POSTGREY} -eq 1 ]] && _register_setup_function '_setup_postgrey'
   [[ ${ENABLE_SASLAUTHD} -eq 1 ]] && _register_setup_function '_setup_saslauthd'
-  [[ ${POSTFIX_INET_PROTOCOLS} != 'all' ]] && _register_setup_function '_setup_inet_protocols'
+  [[ ${POSTFIX_INET_PROTOCOLS} != 'all' ]] && _register_setup_function '_setup_postfix_inet_protocols'
+  [[ ${DOVECOT_INET_PROTOCOLS} != 'all' ]] && _register_setup_function '_setup_dovecot_inet_protocols'
   [[ ${ENABLE_FAIL2BAN} -eq 1 ]] && _register_setup_function '_setup_fail2ban'
+  [[ ${ENABLE_DNSBL} -eq 0 ]] && _register_setup_function '_setup_dnsbl_disable'
 
   _register_setup_function '_setup_dkim'
   _register_setup_function '_setup_ssl'
@@ -260,6 +265,9 @@ setup
 fix
 start_misc
 start_daemons
+
+# marker to check, if container was restarted
+date > /CONTAINER_START
 
 _notify 'tasklog' "${HOSTNAME} is up and running"
 

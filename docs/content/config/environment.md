@@ -62,6 +62,16 @@ Amavis content filter (used for ClamAV & SpamAssassin)
 - 1/2      => Show default informational output
 - 3/4/5    => log debug information (very verbose)
 
+##### ENABLE_DNSBL
+
+This enables the [zen.spamhaus.org](https://www.spamhaus.org/zen/) DNS block list in postfix
+and various [lists](https://github.com/docker-mailserver/docker-mailserver/blob/f7465a50888eef909dbfc01aff4202b9c7d8bc00/target/postfix/main.cf#L58-L66) in postscreen.
+
+Note: Emails will be rejected, if they don't pass the block list checks!
+
+- **0** => DNS block lists are disabled
+- 1     => DNS block lists are enabled
+
 ##### ENABLE_CLAMAV
 
 - **0** => Clamav is disabled
@@ -220,11 +230,19 @@ This option has been added in November 2019. Using other format than Maildir is 
 
 ##### POSTFIX_INET_PROTOCOLS
 
-- **all** => All possible protocols.
-- ipv4 => Use only IPv4 traffic. Most likely you want this behind Docker.
-- ipv6 => Use only IPv6 traffic.
+- **all** => Listen on all interfaces.
+- ipv4 => Listen only on IPv4 interfaces. Most likely you want this behind Docker.
+- ipv6 => Listen only on IPv6 interfaces.
 
-Note: More details in <http://www.postfix.org/postconf.5.html#inet_protocols>
+Note: More details at <http://www.postfix.org/postconf.5.html#inet_protocols>
+
+##### DOVECOT_INET_PROTOCOLS
+
+- **all** => Listen on all interfaces
+- ipv4 => Listen only on IPv4 interfaces. Most likely you want this behind Docker.
+- ipv6 => Listen only on IPv6 interfaces.
+
+Note: More information at <https://dovecot.org/doc/dovecot-example.conf>
 
 #### Reports
 
@@ -248,9 +266,9 @@ Recipient address for pflogsumm reports.
 
 ##### PFLOGSUMM_SENDER
 
-From address for pflogsumm reports.
+Sender address (`FROM`) for pflogsumm reports if pflogsumm reports are enabled.
 
-- **not set** => Use REPORT_SENDER or POSTMASTER_ADDRESS
+- **not set** => Use REPORT_SENDER
 - => Specify the sender address
 
 ##### LOGWATCH_INTERVAL
@@ -267,6 +285,13 @@ Recipient address for logwatch reports if they are enabled.
 
 - **not set** => Use REPORT_RECIPIENT or POSTMASTER_ADDRESS
 - => Specify the recipient address(es)
+
+##### LOGWATCH_SENDER
+
+Sender address (`FROM`) for logwatch reports if logwatch reports are enabled.
+
+- **not set** => Use REPORT_SENDER
+- => Specify the sender address
 
 ##### REPORT_RECIPIENT (deprecated)
 
@@ -352,7 +377,7 @@ Note: this SpamAssassin setting needs `ENABLE_SPAMASSASSIN=1`
 !!! note "This SpamAssassin setting needs `ENABLE_SPAMASSASSIN=1`"
 
     By default, `docker-mailserver` is configured to quarantine spam emails.
-    
+
     If emails are quarantined, they are compressed and stored in a location dependent on the `ONE_DIR` setting above. To inhibit this behaviour and deliver spam emails, set this to a very high value e.g. `100.0`.
 
     If `ONE_DIR=1` (default) the location is `/var/mail-state/lib-amavis/virusmails/`, or if `ONE_DIR=0`: `/var/lib/amavis/virusmails/`. These paths are inside the docker container.
@@ -483,6 +508,7 @@ The following variables overwrite the default values for ```/etc/dovecot/dovecot
 - => Bind dn for LDAP connection. (e.g. `cn=admin,dc=domain,dc=com`)
 
 ##### DOVECOT_DNPASS
+
 - **empty** => same as `LDAP_BIND_PW`
 - => Password for LDAP dn sepecifified in `DOVECOT_DN`.
 
