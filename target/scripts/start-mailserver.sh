@@ -1,14 +1,13 @@
 #! /bin/bash
 
-# shellcheck source=./helper-functions.sh
-. /usr/local/bin/helper-functions.sh
+# shellcheck source=./helpers/index.sh
+source /usr/local/bin/helpers/index.sh
 
-unset FUNCS_SETUP FUNCS_FIX FUNCS_CHECK FUNCS_MISC
-unset DAEMONS_START HOSTNAME DOMAINNAME CHKSUM_FILE
-
-#shellcheck disable=SC2034
+# shellcheck disable=SC2034
 declare -A VARS
 declare -a FUNCS_SETUP FUNCS_FIX FUNCS_CHECK FUNCS_MISC DAEMONS_START
+
+_obtain_hostname_and_domainname
 
 # ------------------------------------------------------------
 # ? <<
@@ -16,7 +15,13 @@ declare -a FUNCS_SETUP FUNCS_FIX FUNCS_CHECK FUNCS_MISC DAEMONS_START
 # ? >> Setup of default and global values / variables
 # ------------------------------------------------------------
 
+# These variables must be defined first; They are used as default values for other variables.
+VARS[POSTMASTER_ADDRESS]="${POSTMASTER_ADDRESS:=postmaster@${DOMAINNAME}}"
+VARS[REPORT_RECIPIENT]="${REPORT_RECIPIENT:=${POSTMASTER_ADDRESS}}"
+VARS[REPORT_SENDER]="${REPORT_SENDER:=mailserver-report@${DOMAINNAME}}"
+
 VARS[AMAVIS_LOGLEVEL]="${AMAVIS_LOGLEVEL:=0}"
+VARS[CLAMAV_MESSAGE_SIZE_LIMIT]="${CLAMAV_MESSAGE_SIZE_LIMIT:=25M}" # 25 MB
 VARS[DEFAULT_RELAY_HOST]="${DEFAULT_RELAY_HOST:=}"
 VARS[DMS_DEBUG]="${DMS_DEBUG:=0}"
 VARS[DOVECOT_INET_PROTOCOLS]="${DOVECOT_INET_PROTOCOLS:=all}"
@@ -34,49 +39,47 @@ VARS[ENABLE_POSTGREY]="${ENABLE_POSTGREY:=0}"
 VARS[ENABLE_QUOTAS]="${ENABLE_QUOTAS:=1}"
 VARS[ENABLE_SASLAUTHD]="${ENABLE_SASLAUTHD:=0}"
 VARS[ENABLE_SPAMASSASSIN]="${ENABLE_SPAMASSASSIN:=0}"
+VARS[ENABLE_SPAMASSASSIN_KAM]="${ENABLE_SPAMASSASSIN_KAM:=0}"
 VARS[ENABLE_SRS]="${ENABLE_SRS:=0}"
 VARS[ENABLE_UPDATE_CHECK]="${ENABLE_UPDATE_CHECK:=1}"
 VARS[FAIL2BAN_BLOCKTYPE]="${FAIL2BAN_BLOCKTYPE:=drop}"
 VARS[FETCHMAIL_PARALLEL]="${FETCHMAIL_PARALLEL:=0}"
 VARS[FETCHMAIL_POLL]="${FETCHMAIL_POLL:=300}"
 VARS[LDAP_START_TLS]="${LDAP_START_TLS:=no}"
-VARS[LOGROTATE_INTERVAL]="${LOGROTATE_INTERVAL:=${REPORT_INTERVAL:-daily}}"
+VARS[LOGROTATE_INTERVAL]="${LOGROTATE_INTERVAL:=weekly}"
 VARS[LOGWATCH_INTERVAL]="${LOGWATCH_INTERVAL:=none}"
+VARS[LOGWATCH_RECIPIENT]="${LOGWATCH_RECIPIENT:=${REPORT_RECIPIENT}}"
+VARS[LOGWATCH_SENDER]="${LOGWATCH_SENDER:=${REPORT_SENDER}}"
 VARS[MOVE_SPAM_TO_JUNK]="${MOVE_SPAM_TO_JUNK:=1}"
 VARS[NETWORK_INTERFACE]="${NETWORK_INTERFACE:=eth0}"
 VARS[ONE_DIR]="${ONE_DIR:=1}"
-VARS[OVERRIDE_HOSTNAME]="${OVERRIDE_HOSTNAME}"
+VARS[OVERRIDE_HOSTNAME]="${OVERRIDE_HOSTNAME:-}"
+VARS[PERMIT_DOCKER]="${PERMIT_DOCKER:=none}"
+VARS[PFLOGSUMM_RECIPIENT]="${PFLOGSUMM_RECIPIENT:=${REPORT_RECIPIENT}}"
+VARS[PFLOGSUMM_SENDER]="${PFLOGSUMM_SENDER:=${REPORT_SENDER}}"
+VARS[PFLOGSUMM_TRIGGER]="${PFLOGSUMM_TRIGGER:=none}"
 VARS[POSTFIX_INET_PROTOCOLS]="${POSTFIX_INET_PROTOCOLS:=all}"
 VARS[POSTFIX_MAILBOX_SIZE_LIMIT]="${POSTFIX_MAILBOX_SIZE_LIMIT:=0}"
-VARS[POSTFIX_MESSAGE_SIZE_LIMIT]="${POSTFIX_MESSAGE_SIZE_LIMIT:=10240000}" # ~10MB
+VARS[POSTFIX_MESSAGE_SIZE_LIMIT]="${POSTFIX_MESSAGE_SIZE_LIMIT:=10240000}" # ~10 MB
 VARS[POSTGREY_AUTO_WHITELIST_CLIENTS]="${POSTGREY_AUTO_WHITELIST_CLIENTS:=5}"
 VARS[POSTGREY_DELAY]="${POSTGREY_DELAY:=300}"
 VARS[POSTGREY_MAX_AGE]="${POSTGREY_MAX_AGE:=35}"
 VARS[POSTGREY_TEXT]="${POSTGREY_TEXT:=Delayed by Postgrey}"
 VARS[POSTSCREEN_ACTION]="${POSTSCREEN_ACTION:=enforce}"
 VARS[RELAY_HOST]="${RELAY_HOST:=}"
-VARS[REPORT_RECIPIENT]="${REPORT_RECIPIENT:="0"}"
 VARS[SA_KILL]=${SA_KILL:="6.31"}
 VARS[SA_SPAM_SUBJECT]=${SA_SPAM_SUBJECT:="***SPAM*** "}
 VARS[SA_TAG]=${SA_TAG:="2.0"}
 VARS[SA_TAG2]=${SA_TAG2:="6.31"}
 VARS[SMTP_ONLY]="${SMTP_ONLY:=0}"
-VARS[SPAMASSASSIN_SPAM_TO_INBOX_SET]="${SPAMASSASSIN_SPAM_TO_INBOX:-not set}"
-VARS[SPAMASSASSIN_SPAM_TO_INBOX]="${SPAMASSASSIN_SPAM_TO_INBOX:=0}"
+VARS[SPAMASSASSIN_SPAM_TO_INBOX]="${SPAMASSASSIN_SPAM_TO_INBOX:=1}"
 VARS[SPOOF_PROTECTION]="${SPOOF_PROTECTION:=0}"
 VARS[SRS_SENDER_CLASSES]="${SRS_SENDER_CLASSES:=envelope_sender}"
 VARS[SSL_TYPE]="${SSL_TYPE:=}"
 VARS[SUPERVISOR_LOGLEVEL]="${SUPERVISOR_LOGLEVEL:=warn}"
 VARS[TLS_LEVEL]="${TLS_LEVEL:=modern}"
 VARS[UPDATE_CHECK_INTERVAL]="${UPDATE_CHECK_INTERVAL:=1d}"
-# shellcheck disable=SC2034
 VARS[VIRUSMAILS_DELETE_DELAY]="${VIRUSMAILS_DELETE_DELAY:=7}"
-
-export HOSTNAME DOMAINNAME CHKSUM_FILE
-
-_obtain_hostname_and_domainname
-
-CHKSUM_FILE=/tmp/docker-mailserver-config-chksum
 
 # ------------------------------------------------------------
 # ? << Setup of default and global values / variables
@@ -114,6 +117,7 @@ function register_functions
   [[ ${DOVECOT_INET_PROTOCOLS} != 'all' ]] && _register_setup_function '_setup_dovecot_inet_protocols'
   [[ ${ENABLE_FAIL2BAN} -eq 1 ]] && _register_setup_function '_setup_fail2ban'
   [[ ${ENABLE_DNSBL} -eq 0 ]] && _register_setup_function '_setup_dnsbl_disable'
+  [[ ${CLAMAV_MESSAGE_SIZE_LIMIT} != '25M' ]] && _register_setup_function '_setup_clamav_sizelimit'
 
   _register_setup_function '_setup_dkim'
   _register_setup_function '_setup_ssl'
@@ -236,19 +240,19 @@ function _register_misc_function
 # ------------------------------------------------------------
 
 # shellcheck source=./startup/check-stack.sh
-. /usr/local/bin/check-stack.sh
+source /usr/local/bin/check-stack.sh
 
 # shellcheck source=./startup/setup-stack.sh
-. /usr/local/bin/setup-stack.sh
+source /usr/local/bin/setup-stack.sh
 
 # shellcheck source=./startup/fixes-stack.sh
-. /usr/local/bin/fixes-stack.sh
+source /usr/local/bin/fixes-stack.sh
 
 # shellcheck source=./startup/misc-stack.sh
-. /usr/local/bin/misc-stack.sh
+source /usr/local/bin/misc-stack.sh
 
 # shellcheck source=./startup/daemons-stack.sh
-. /usr/local/bin/daemons-stack.sh
+source /usr/local/bin/daemons-stack.sh
 
 # ------------------------------------------------------------
 # ? << Sourcing all stacks

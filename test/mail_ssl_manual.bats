@@ -1,14 +1,6 @@
 #!/usr/bin/env bats
 load 'test_helper/common'
 
-function setup() {
-    run_setup_file_if_necessary
-}
-
-function teardown() {
-    run_teardown_file_if_necessary
-}
-
 function setup_file() {
     # Internal copies made by `start-mailserver.sh`:
     export PRIMARY_KEY='/etc/dms/tls/key'
@@ -22,20 +14,21 @@ function setup_file() {
     export SSL_ALT_KEY_PATH='/config/ssl/key.rsa.pem'
     export SSL_ALT_CERT_PATH='/config/ssl/cert.rsa.pem'
 
-    local DOMAIN='example.test'
     local PRIVATE_CONFIG
+    export DOMAIN_SSL_MANUAL='example.test'
     PRIVATE_CONFIG="$(duplicate_config_for_container .)"
 
     docker run -d --name mail_manual_ssl \
         --volume "${PRIVATE_CONFIG}/:/tmp/docker-mailserver/" \
-        --volume "$(pwd)/test/test-files/ssl/${DOMAIN}/with_ca/ecdsa/:/config/ssl/:ro" \
-        --env DMS_DEBUG=0 \
+        --volume "$(pwd)/test/test-files/ssl/${DOMAIN_SSL_MANUAL}/with_ca/ecdsa/:/config/ssl/:ro" \
+        --env DMS_DEBUG=1 \
         --env SSL_TYPE='manual' \
+        --env TLS_LEVEL='modern' \
         --env SSL_KEY_PATH="${SSL_KEY_PATH}" \
         --env SSL_CERT_PATH="${SSL_CERT_PATH}" \
         --env SSL_ALT_KEY_PATH="${SSL_ALT_KEY_PATH}" \
         --env SSL_ALT_CERT_PATH="${SSL_ALT_CERT_PATH}" \
-        --hostname "mail.${DOMAIN}" \
+        --hostname "mail.${DOMAIN_SSL_MANUAL}" \
         --tty \
         "${NAME}" # Image name
     wait_for_finished_setup_in_container mail_manual_ssl
@@ -43,10 +36,6 @@ function setup_file() {
 
 function teardown_file() {
     docker rm -f mail_manual_ssl
-}
-
-@test "first" {
-    skip 'this test must come first to reliably identify when to run setup_file'
 }
 
 @test "checking ssl: ENV vars provided are valid files" {
@@ -109,6 +98,14 @@ function teardown_file() {
     assert_equal "${RESULT}" 'Verification: OK'
 }
 
-@test "last" {
-    skip 'this test is only there to reliably mark the end for the teardown_file'
+@test "checking ssl: manual cert changes are picked up by check-for-changes" {
+    printf 'someThingsChangedHere' \
+      >>"$(pwd)/test/test-files/ssl/${DOMAIN_SSL_MANUAL}/with_ca/ecdsa/key.ecdsa.pem"
+    sleep 10
+
+    run docker exec mail_manual_ssl /bin/bash -c "supervisorctl tail -3000 changedetector"
+    assert_output --partial 'Change detected'
+    assert_output --partial 'Manual certificates have changed'
+
+    sed -i '/someThingsChangedHere/d' "$(pwd)/test/test-files/ssl/${DOMAIN_SSL_MANUAL}/with_ca/ecdsa/key.ecdsa.pem"
 }

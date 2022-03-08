@@ -4,14 +4,6 @@ load 'test_helper/common'
 # use `supervisorctl tail -<num bytes> changedetector` instead to increase log output.
 # Default `<num bytes>` appears to be around 1500.
 
-function setup() {
-  run_setup_file_if_necessary
-}
-
-function teardown() {
-  run_teardown_file_if_necessary
-}
-
 function setup_file() {
   local PRIVATE_CONFIG
   PRIVATE_CONFIG="$(duplicate_config_for_container . mail_changedetector_one)"
@@ -36,11 +28,6 @@ function teardown_file() {
   docker rm -f mail_changedetector_two
 }
 
-# this test must come first to reliably identify when to run setup_file
-@test "first" {
-  skip 'Starting testing of changedetector'
-}
-
 @test "checking changedetector: servers are ready" {
   wait_for_service mail_changedetector_one changedetector
   wait_for_service mail_changedetector_two changedetector
@@ -48,7 +35,7 @@ function teardown_file() {
 
 @test "checking changedetector: can detect changes & between two containers using same config" {
   echo "" >> "$(private_config_path mail_changedetector_one)/postfix-accounts.cf"
-  sleep 15
+  sleep 25
   run docker exec mail_changedetector_one /bin/bash -c "supervisorctl tail -3000 changedetector"
   assert_output --partial "postfix: stopped"
   assert_output --partial "postfix: started"
@@ -90,9 +77,4 @@ function teardown_file() {
   sleep 65
   run docker exec mail_changedetector_one /bin/bash -c "supervisorctl tail -3000 changedetector"
   assert_output --partial "Removed stale lock"
-}
-
-# this test is only there to reliably mark the end for the teardown_file
-@test "last" {
-  skip 'Finished testing of changedetector'
 }
